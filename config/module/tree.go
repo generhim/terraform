@@ -27,6 +27,13 @@ type Tree struct {
 	children map[string]*Tree
 	path     []string
 	lock     sync.RWMutex
+
+	// version is the final version of the config loaded for the Tree's module
+	version string
+	// parent allows us to walk back up the tree and determine if there are any
+	// versioned ancestor modules which may effect the stored location of
+	// submodules
+	parent *Tree
 }
 
 // NewTree returns a new Tree for the given config structure.
@@ -188,7 +195,7 @@ func (t *Tree) Load(storage getter.Storage, mode GetMode) error {
 		// The key is the string that will be hashed to uniquely id the Source.
 		// The leading digit can be incremented to force re-fetch all existing
 		// modules.
-		key := fmt.Sprintf("1.root.%s-%s", strings.Join(path, "."), m.Source)
+		key := "1." + t.versionedPathKey(m)
 
 		log.Printf("[TRACE] module source: %q", m.Source)
 		// Split out the subdir if we have one.
@@ -224,6 +231,8 @@ func (t *Tree) Load(storage getter.Storage, mode GetMode) error {
 				}
 				// Set the path of this child
 				children[m.Name].path = path
+				// set the parent pointer
+				children[m.Name].parent = t
 				continue
 			}
 		}
@@ -284,6 +293,9 @@ func (t *Tree) Load(storage getter.Storage, mode GetMode) error {
 		}
 		// Set the path of this child
 		children[m.Name].path = path
+
+		// set the pointer back to this tree
+		children[m.Name].parent = t
 	}
 
 	// Go through all the children and load them.
@@ -598,6 +610,26 @@ func (t *Tree) Validate() error {
 	}
 
 	return newErr.ErrOrNil()
+}
+
+// versionedPathKey returns a path string with any necessary version
+// information encoded. This is to provide a unique key for our module storage,
+// since submodules need to know which versions of their ancestor modules they
+// are loaded from.
+func (t *Tree) versionedPathKey(m *Module) string {
+	path := make([]string, 0, len(t.path)+1)
+	path = append(path, m.Name)
+
+	// we may have been loaded under a blank Tree, so always check for a name
+	// too.
+	p := t
+	for p != nil && p.name != "" {
+		path = append(path, fmt.Sprintf("%s_%s", p.name, p.version))
+		p = p.parent
+
+	}
+
+	return strings.Join(path, ".")
 }
 
 // treeError is an error use by Tree.Validate to accumulates all
