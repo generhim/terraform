@@ -10,6 +10,7 @@ import (
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
 
+	"github.com/hashicorp/terraform/registry/regsrc"
 	"github.com/hashicorp/terraform/registry/response"
 	"github.com/hashicorp/terraform/svchost"
 	"github.com/hashicorp/terraform/svchost/disco"
@@ -44,26 +45,21 @@ func (e errModuleNotFound) Error() string {
 }
 
 // Lookup module versions in the registry.
-func lookupModuleVersions(hostname, module string) (*response.ModuleVersions, error) {
-	if hostname == "" {
-		hostname = defaultRegistry
+func lookupModuleVersions(module *regsrc.Module) (*response.ModuleVersions, error) {
+	if module.RawHost == nil {
+		module.RawHost = regsrc.NewFriendlyHost(defaultRegistry)
 	}
 
-	host, err := svchost.ForComparison(hostname)
-	if err != nil {
-		return nil, err
-	}
-
-	regUrl := regDisco.DiscoverServiceURL(host, serviceID)
+	regUrl := regDisco.DiscoverServiceURL(svchost.Hostname(module.RawHost.Normalized()), serviceID)
 	if regUrl == nil {
 		regUrl = &url.URL{
 			Scheme: "https",
-			Host:   string(host),
+			Host:   module.RawHost.String(),
 			Path:   defaultApiPath,
 		}
 	}
 
-	location := fmt.Sprintf("%s/%s/versions", regUrl, module)
+	location := fmt.Sprintf("%s/%s/%s/%s/versions", regUrl, module.RawNamespace, module.RawName, module.RawProvider)
 	log.Printf("[DEBUG] fetching module versions from %q", location)
 
 	req, err := http.NewRequest("GET", location, nil)
@@ -83,7 +79,7 @@ func lookupModuleVersions(hostname, module string) (*response.ModuleVersions, er
 	case http.StatusOK:
 		// OK
 	case http.StatusNotFound:
-		return nil, errModuleNotFound(module)
+		return nil, errModuleNotFound(module.String())
 	default:
 		return nil, fmt.Errorf("error looking up module versions: %s", resp.Status)
 	}
