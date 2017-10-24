@@ -1,11 +1,15 @@
 package module
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/hashicorp/terraform/registry/response"
+)
 
 func TestNewestModuleVersion(t *testing.T) {
-	mpv := &moduleProviderVersions{
+	mpv := &response.ModuleProviderVersions{
 		Source: "registry/test/module",
-		Versions: []*moduleVersion{
+		Versions: []*response.ModuleVersion{
 			{Version: "0.0.4"},
 			{Version: "0.3.1"},
 			{Version: "2.0.1"},
@@ -36,9 +40,9 @@ func TestNewestModuleVersion(t *testing.T) {
 }
 
 func TestNewestInvalidModuleVersion(t *testing.T) {
-	mpv := &moduleProviderVersions{
+	mpv := &response.ModuleProviderVersions{
 		Source: "registry/test/module",
-		Versions: []*moduleVersion{
+		Versions: []*response.ModuleVersion{
 			{Version: "WTF"},
 			{Version: "2.0.1"},
 		},

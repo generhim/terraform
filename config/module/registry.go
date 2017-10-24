@@ -10,6 +10,7 @@ import (
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
 
+	"github.com/hashicorp/terraform/registry/response"
 	"github.com/hashicorp/terraform/svchost"
 	"github.com/hashicorp/terraform/svchost/disco"
 	"github.com/hashicorp/terraform/version"
@@ -36,39 +37,6 @@ func init() {
 	client.Timeout = requestTimeout
 }
 
-// The types to deserialize the registry versions api response.
-type moduleVersions struct {
-	modules []*moduleProviderVersions `json:"modules"`
-}
-
-type moduleProviderVersions struct {
-	Source   string           `json:"source"`
-	Versions []*moduleVersion `json:"versions"`
-}
-
-type moduleVersion struct {
-	Version    string              `json:"version"`
-	Root       versionSubmodule    `json:"root"`
-	Submodules []*versionSubmodule `json:"submodules"`
-}
-
-type versionSubmodule struct {
-	Path         string               `json:"path,omitempty"`
-	Providers    []*moduleProviderDep `json:"providers"`
-	Dependencies []*moduleDep         `json:"dependencies"`
-}
-
-type moduleProviderDep struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-}
-
-type moduleDep struct {
-	Name    string `json:"name"`
-	Source  string `json:"source"`
-	Version string `json:"version"`
-}
-
 type errModuleNotFound string
 
 func (e errModuleNotFound) Error() string {
@@ -76,7 +44,7 @@ func (e errModuleNotFound) Error() string {
 }
 
 // Lookup module versions in the registry.
-func lookupModuleVersions(hostname, module string) (*moduleVersions, error) {
+func lookupModuleVersions(hostname, module string) (*response.ModuleVersions, error) {
 	if hostname == "" {
 		hostname = defaultRegistry
 	}
@@ -120,7 +88,7 @@ func lookupModuleVersions(hostname, module string) (*moduleVersions, error) {
 		return nil, fmt.Errorf("error looking up module versions: %s", resp.Status)
 	}
 
-	var versions moduleVersions
+	var versions response.ModuleVersions
 
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(&versions); err != nil {

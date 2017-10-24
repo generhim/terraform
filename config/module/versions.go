@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/terraform/registry/response"
 )
 
 const anyVersion = ">=0.0.0"
@@ -66,9 +67,9 @@ func newest(versions []string, constraint string) (string, error) {
 
 // return the newest *moduleVersion that matches the given constraint
 // TODO: reconcile these two types and newest* functions
-func newestVersion(moduleVersions []*moduleVersion, constraint string) (*moduleVersion, error) {
+func newestVersion(moduleVersions []*response.ModuleVersion, constraint string) (*response.ModuleVersion, error) {
 	var versions []string
-	modules := make(map[string]*moduleVersion)
+	modules := make(map[string]*response.ModuleVersion)
 
 	for _, m := range moduleVersions {
 		versions = append(versions, m.Version)
