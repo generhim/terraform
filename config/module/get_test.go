@@ -2,6 +2,7 @@ package module
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -59,12 +60,8 @@ func latestVersion(versions []string) string {
 	return col[len(col)-1].String()
 }
 
-// Just enough like a registry to exercise our code.
-// Returns the location of the latest version
-func mockRegistry() *httptest.Server {
+func mockRegHandler() http.Handler {
 	mux := http.NewServeMux()
-	server := httptest.NewServer(mux)
-
 	mux.Handle("/v1/modules/",
 		http.StripPrefix("/v1/modules/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			p := strings.TrimLeft(r.URL.Path, "/")
@@ -98,6 +95,23 @@ func mockRegistry() *httptest.Server {
 		})),
 	)
 
+	mux.HandleFunc("/.well-known/terraform.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"modules.v1":"/v1/modules/"}`)
+	})
+
+	return mux
+}
+
+// Just enough like a registry to exercise our code.
+// Returns the location of the latest version
+func mockRegistry() *httptest.Server {
+	server := httptest.NewServer(mockRegHandler())
+	return server
+}
+
+func mockTLSRegistry() *httptest.Server {
+	server := httptest.NewTLSServer(mockRegHandler())
 	return server
 }
 
