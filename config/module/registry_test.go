@@ -31,7 +31,7 @@ func mockTransport(server *httptest.Server) *http.Transport {
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		host, _, _ := net.SplitHostPort(addr)
 		switch host {
-		case "example.com", "localhost", "localhost.localdomain":
+		case "example.com", "localhost", "localhost.localdomain", "registry.terraform.io":
 			addr = "127.0.0.1"
 			if port != "" {
 				addr += ":" + port
@@ -70,34 +70,40 @@ func TestLookupModuleVersions(t *testing.T) {
 	regDisco := disco.NewDisco()
 	regDisco.Transport = mockTransport(server)
 
-	modsrc, err := regsrc.ParseModuleSource("example.com/test-versions/name/provider")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	resp, err := lookupModuleVersions(regDisco, modsrc)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(resp.Modules) != 1 {
-		t.Fatal("expected 1 module, got", len(resp.Modules))
-	}
-
-	mod := resp.Modules[0]
-	name := "test-versions/name/provider"
-	if mod.Source != name {
-		t.Fatalf("expected module name %q, got %q", name, mod.Source)
-	}
-
-	if len(mod.Versions) != 4 {
-		t.Fatal("expected 4 versions, got", len(mod.Versions))
-	}
-
-	for _, v := range mod.Versions {
-		_, err := version.NewVersion(v.Version)
+	// test with and without a hostname
+	for _, src := range []string{
+		"example.com/test-versions/name/provider",
+		"test-versions/name/provider",
+	} {
+		modsrc, err := regsrc.ParseModuleSource(src)
 		if err != nil {
-			t.Fatalf("invalid version %q: %s", v.Version, err)
+			t.Fatal(err)
+		}
+
+		resp, err := lookupModuleVersions(regDisco, modsrc)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(resp.Modules) != 1 {
+			t.Fatal("expected 1 module, got", len(resp.Modules))
+		}
+
+		mod := resp.Modules[0]
+		name := "test-versions/name/provider"
+		if mod.Source != name {
+			t.Fatalf("expected module name %q, got %q", name, mod.Source)
+		}
+
+		if len(mod.Versions) != 4 {
+			t.Fatal("expected 4 versions, got", len(mod.Versions))
+		}
+
+		for _, v := range mod.Versions {
+			_, err := version.NewVersion(v.Version)
+			if err != nil {
+				t.Fatalf("invalid version %q: %s", v.Version, err)
+			}
 		}
 	}
 }
