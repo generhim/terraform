@@ -107,3 +107,46 @@ func TestLookupModuleVersions(t *testing.T) {
 		}
 	}
 }
+
+func TestACCLookupModuleVersions(t *testing.T) {
+	server := mockTLSRegistry()
+	defer server.Close()
+	regDisco := disco.NewDisco()
+
+	// test with and without a hostname
+	for _, src := range []string{
+		"terraform-aws-modules/vpc/aws",
+		defaultRegistry + "/terraform-aws-modules/vpc/aws",
+	} {
+		modsrc, err := regsrc.ParseModuleSource(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp, err := lookupModuleVersions(regDisco, modsrc)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(resp.Modules) != 1 {
+			t.Fatal("expected 1 module, got", len(resp.Modules))
+		}
+
+		mod := resp.Modules[0]
+		name := "terraform-aws-modules/vpc/aws"
+		if mod.Source != name {
+			t.Fatalf("expected module name %q, got %q", name, mod.Source)
+		}
+
+		if len(mod.Versions) == 0 {
+			t.Fatal("expected multiple versions, got 0")
+		}
+
+		for _, v := range mod.Versions {
+			_, err := version.NewVersion(v.Version)
+			if err != nil {
+				t.Fatalf("invalid version %q: %s", v.Version, err)
+			}
+		}
+	}
+}
