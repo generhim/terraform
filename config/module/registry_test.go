@@ -10,6 +10,8 @@ import (
 	"time"
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
+	version "github.com/hashicorp/go-version"
+	"github.com/hashicorp/terraform/registry/regsrc"
 	"github.com/hashicorp/terraform/svchost/disco"
 )
 
@@ -59,5 +61,43 @@ func TestMockDiscovery(t *testing.T) {
 
 	if regURL.Host != "example.com" {
 		t.Fatal("expected registry host example.com, got:", regURL.Host)
+	}
+}
+
+func TestLookupModuleVersions(t *testing.T) {
+	server := mockTLSRegistry()
+	defer server.Close()
+	regDisco := disco.NewDisco()
+	regDisco.Transport = mockTransport(server)
+
+	modsrc, err := regsrc.ParseModuleSource("example.com/test-versions/name/provider")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := lookupModuleVersions(regDisco, modsrc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(resp.Modules) != 1 {
+		t.Fatal("expected 1 module, got", len(resp.Modules))
+	}
+
+	mod := resp.Modules[0]
+	name := "test-versions/name/provider"
+	if mod.Source != name {
+		t.Fatalf("expected module name %q, got %q", name, mod.Source)
+	}
+
+	if len(mod.Versions) != 4 {
+		t.Fatal("expected 4 versions, got", len(mod.Versions))
+	}
+
+	for _, v := range mod.Versions {
+		_, err := version.NewVersion(v.Version)
+		if err != nil {
+			t.Fatalf("invalid version %q: %s", v.Version, err)
+		}
 	}
 }
